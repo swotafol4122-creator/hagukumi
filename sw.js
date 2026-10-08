@@ -1,18 +1,20 @@
 /* ハグクミ sw.js — オフラインでも ひらけるように する */
-const CACHE = 'hagukumi-v1.0.1';
-const V = '?v=1.0.1';
+const CACHE = 'hagukumi-v1.0.2';
+const V = '?v=1.0.2';
 const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
+  './', 'index.html', 'manifest.webmanifest' + V, 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
 ].concat([
   'style.css', 'peerjs.min.js', 'qrcode.js',
   'core.js', 'data.js', 'art.js', 'pet.js', 'audio.js', 'ui.js', 'screens.js',
   'minigames.js', 'battle.js', 'battle-ui.js', 'net.js', 'main.js',
 ].map((f) => f + V));
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // HTTPキャッシュの ふるい ファイルを つかわないように cache: 'reload'
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  // おなじ github.io に ある ほかの ゲームの キャッシュは けさない
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('hagukumi-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', (e) => {
   const req = e.request;

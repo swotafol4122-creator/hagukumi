@@ -35,7 +35,8 @@
         h('h1', { class: 'logo' }, 'ハグクミ'),
         h('p', { class: 'tagline' }, 'たまごから そだてて、そだてかたで すがたが かわる。いっしょに ぼうけんして、ともだちと たいせん しよう。'),
         h('button', { class: 'btn big pink', onclick: () => { HG.audio.sfx('select'); save().started = true; persist(); S.eggSelect(); } }, 'はじめる'),
-        h('button', { class: 'btn small white', onclick: () => S.importSheet() }, 'データを よみこむ')
+        h('button', { class: 'btn small white', onclick: () => S.importSheet() }, 'データを よみこむ'),
+        HG.install && HG.install.evt && !HG.isApp() ? h('button', { class: 'appbtn', style: { alignSelf: 'center', marginTop: '4px' }, onclick: () => HG.doInstall(), html: HG.art.icon('phone') + '<span>アプリにする</span>' }) : null
       )
     );
   };
@@ -225,7 +226,8 @@
       )
     );
     const coins = h('div', { class: 'coins', html: HG.art.icon('coin') + `<span id="coin-n">${save().coins}</span>`, title: 'おこづかい' });
-    return h('header', { class: 'topbar' }, who, coins);
+    const app = HG.install && HG.install.evt && !HG.isApp() ? h('button', { class: 'appbtn', onclick: () => HG.doInstall(), html: HG.art.icon('phone') + '<span>アプリにする</span>' }) : null;
+    return h('header', { class: 'topbar' }, who, app, coins);
   };
   S.refreshTop = function () {
     const old = document.querySelector('.topbar');
@@ -836,6 +838,8 @@
     row('train', 'とっくん', 'れんしゅうバトル。まけても しなない', () => S.spar(), '#dff7c9');
     if (s.best.chapter >= 8) row('tower', 'ゆめの とう', 'クリアご の チャレンジ。ゆめの なかなので しなない', () => S.tower(), '#e6dcff');
     row('house', 'あずかりや', 'るすの あいだ じかんを とめる', () => S.daycareSheet(), '#ffe2c9');
+    if (HG.isApp && HG.isApp()) row('phone', 'アプリとして ひらいています', 'ホーム画面から あそべているよ', () => UI.toast('いまは アプリとして ひらいているよ'), '#dff7c9');
+    else row('phone', 'アプリにする', HG.install && HG.install.evt ? 'タップで ホーム画面に いれる' : 'ホーム画面に いれる ほうほう', () => HG.doInstall(), '#d6f5ff');
     row('gear', 'せってい', 'おと・バックアップ・データ', () => S.settingsSheet(), '#eeeeee');
     row('help', 'あそびかた', 'そだてかたと バトルの コツ', () => S.helpSheet(), '#eeeeee');
     card.appendChild(list);
@@ -871,6 +875,24 @@
       ens.push(['_tw' + i, lv]);
     }
     HG.battleUI.start({ mode: 'tower', arena: 'dream', enemies: ens, floor });
+  };
+
+  // ───────── アプリにする ほうほう ─────────
+  S.installHelp = function () {
+    UI.sheet({
+      title: 'アプリにする',
+      body: (b) => {
+        const sec = (t, lines) => b.appendChild(h('div', { class: 'card flat gap' }, h('h3', {}, t), ...lines.map((l) => h('p', { style: { margin: 0 }, class: 'small' }, l))));
+        sec('Android（Chrome）', ['うえに みどりの「アプリにする」ボタンが でたら、それを おしてね。', 'でない ときは ︙ メニュー →「ホーム画面に追加」→「インストール」。', 'おわると ホーム画面や アプリいちらんに「ハグクミ」が でるよ。1ぷんくらい かかる ことが あるよ。']);
+        sec('iPhone（Safari）', ['きょうゆうボタン →「ホーム画面に追加」。']);
+        sec('「すでに インストールされています」と でて ひらけない とき', [
+          'おなじ サイト（' + location.host + '）の べつの ゲームを アプリに していると、Chrome の メニューからは こう でて しまうよ。Chrome の しくみで、URL の まちがいでは ないよ。',
+          'この ときは、うえに でる みどりの「アプリにする」ボタンから いれてね。ページを ひらいて 30びょう くらい あそぶと でてくるよ。',
+          'それでも でない ときは、スマホの せってい → アプリ → Chrome →「強制停止」してから、このページを ひらきなおしてね。セーブデータは きえないよ。',
+          'どうしても だめな ときは「ホーム画面に追加」→「ショートカットを作成」でも あそべるよ（Chrome の なかで ひらきます）。',
+        ]);
+      },
+    });
   };
 
   // ───────── せってい ─────────

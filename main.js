@@ -4,6 +4,41 @@
   const P = HG.P, S = HG.screens, U = HG.util, UI = HG.ui;
   let lastSave = 0, lastBeep = 0, hiddenAt = 0;
 
+  // ───────── アプリとして いれる ─────────
+  HG.install = { evt: null };
+  HG.isApp = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  // Chrome は 「⋮ → ホーム画面に追加」で おなじ ドメインの べつの アプリを
+  // 「インストールずみ」と まちがえる ことが あるので、ゲームの なかに ボタンを だす。
+  HG.install.refresh = () => {
+    if (HG.state.busy || HG.state.inBattle) return;
+    if (document.querySelector('.title')) return S.title();
+    S.refreshTop();
+    if (HG.state.tab === 'menu' && document.querySelector('.topbar') && !document.querySelector('.back,.full')) S.main('menu');
+  };
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    HG.install.evt = e;
+    HG.install.refresh();
+  });
+  window.addEventListener('appinstalled', () => {
+    HG.install.evt = null;
+    UI.toast('アプリに なったよ！ ホーム画面を みてね');
+    HG.install.refresh();
+  });
+  HG.doInstall = async () => {
+    const e = HG.install.evt;
+    if (!e) return S.installHelp();
+    HG.install.evt = null;
+    try {
+      await e.prompt();
+      const r = await e.userChoice;
+      if (r && r.outcome === 'accepted') UI.toast('インストールちゅう… すこし まってね');
+    } catch (er) {
+      S.installHelp();
+    }
+    HG.install.refresh();
+  };
+
   function boot() {
     // デバッグ: ?ff=じかん で じかんを すすめる
     if (HG.DEBUG) {

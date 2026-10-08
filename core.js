@@ -2,7 +2,7 @@
 'use strict';
 window.HG = window.HG || {};
 (function (HG) {
-  HG.VERSION = '1.0.1';
+  HG.VERSION = '1.0.2';
   HG.DEBUG = /[?&]debug=1/.test(location.search);
 
   const U = HG.util = {};

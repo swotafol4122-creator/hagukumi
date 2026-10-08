@@ -741,6 +741,7 @@
     hand: '<path d="M8 13 V6 C8 5 9 4 10 4 C11 4 12 5 12 6 V11 M12 7 C12 6 13 5 14 5 C15 5 16 6 16 7 V12 M16 9 C16 8 17 7 18 7 C19 7 20 8 20 9 V14 C20 18 17 21 13 21 C10 21 8 19 6 16 L4 12 C3.5 11 4 10 5 10 C6 10 7 11 8 13" fill="none"/>',
     shirt: '<path d="M8 4 L4 7 L6 11 L8 10 V20 H16 V10 L18 11 L20 7 L16 4 C15 6 9 6 8 4 Z" fill="none"/>',
     help: '<circle cx="12" cy="12" r="9" fill="none"/><path d="M9.5 9.5 C9.5 7 14.5 7 14.5 9.5 C14.5 11.5 12 11.5 12 14" fill="none"/><circle cx="12" cy="17" r="1" fill="currentColor"/>',
+    phone: '<rect x="6" y="3" width="12" height="18" rx="2.5" fill="none"/><path d="M12 7 V14 M9 11.5 L12 14.5 L15 11.5" fill="none"/><path d="M10.5 18 H13.5" fill="none"/>',
   };
   A.icon = (name, cls) =>
     `<svg viewBox="0 0 24 24" class="ic${cls ? ' ' + cls : ''}" aria-hidden="true" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
