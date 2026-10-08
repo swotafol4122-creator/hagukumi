@@ -1,12 +1,12 @@
 /* ハグクミ sw.js — オフラインでも ひらけるように する */
-const CACHE = 'hagukumi-v1.0.0';
-const V = '?v=1.0.0';
+const CACHE = 'hagukumi-v1.0.1';
+const V = '?v=1.0.1';
 const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
+  './', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
 ].concat([
-  'css/style.css', 'lib/peerjs.min.js', 'lib/qrcode.js',
-  'js/core.js', 'js/data.js', 'js/art.js', 'js/pet.js', 'js/audio.js', 'js/ui.js', 'js/screens.js',
-  'js/minigames.js', 'js/battle.js', 'js/battle-ui.js', 'js/net.js', 'js/main.js',
+  'style.css', 'peerjs.min.js', 'qrcode.js',
+  'core.js', 'data.js', 'art.js', 'pet.js', 'audio.js', 'ui.js', 'screens.js',
+  'minigames.js', 'battle.js', 'battle-ui.js', 'net.js', 'main.js',
 ].map((f) => f + V));
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

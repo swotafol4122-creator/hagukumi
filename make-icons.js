@@ -1,10 +1,10 @@
-// アイコンを つくる: node tools/make-icons.js
+// アイコンを つくる: node make-icons.js
 const fs = require('fs'); const vm = require('vm'); const path = require('path');
-const root = path.join(__dirname, '..');
+const root = __dirname;
 global.window = global; global.location = { search: '' };
 global.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
 global.document = { createElement: () => ({ getContext: () => ({}) }) }; global.navigator = {};
-for (const f of ['core', 'data', 'art']) vm.runInThisContext(fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8'));
+for (const f of ['core', 'data', 'art']) vm.runInThisContext(fs.readFileSync(path.join(root, f + '.js'), 'utf8'));
 const sharp = require('/opt/npm-tools/node_modules/sharp');
 const inner = HG.art.creature({ stage: 2, egg: 'red', type: 'fire', style: 'cute', dna: 4 }, { uid: 'ic', expr: 'happy' })
   .replace('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="hg-creature">', '').replace(/<\/svg>$/, '');
@@ -19,7 +19,7 @@ function iconSvg(pad) {
   <svg x="${pad}" y="${pad - c * 0.02}" width="${c}" height="${c}" viewBox="0 0 200 200">${inner}</svg></svg>`;
 }
 (async () => {
-  const icons = path.join(root, 'icons');
+  const icons = root;
   fs.mkdirSync(icons, { recursive: true });
   const any = Buffer.from(iconSvg(40));
   const mask = Buffer.from(iconSvg(96));

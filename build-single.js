@@ -1,11 +1,11 @@
-// 1ファイル版（プレビュー用）を つくる: node tools/build-single.js 出力パス
+// 1ファイル版（プレビュー用）を つくる: node build-single.js 出力パス
 // たいせん（WebRTC）は つかえない ばしょ むけ
 const fs = require('fs'), path = require('path');
-const root = path.join(__dirname, '..');
+const root = __dirname;
 const out = process.argv[2] || path.join(root, 'hagukumi-preview.html');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'css/style.css'), 'utf8');
-const scripts = [...html.matchAll(/<script src="([^"?]+)(?:\?[^"]*)?"><\/script>/g)].map((m) => m[1]).filter((f) => !f.startsWith('lib/'));
+const css = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+const scripts = [...html.matchAll(/<script src="([^"?]+)(?:\?[^"]*)?"><\/script>/g)].map((m) => m[1]).filter((f) => f !== 'peerjs.min.js' && f !== 'qrcode.js');
 const js = scripts.map((f) => `/* ${f} */\n` + fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
 const fonts = (html.match(/<link rel="stylesheet" href="https:\/\/fonts[^>]+>/) || [''])[0];
 const page = `<title>ハグクミ</title>

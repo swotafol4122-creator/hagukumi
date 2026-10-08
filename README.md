@@ -3,7 +3,7 @@
 たまごから育てて、育て方で姿・タイプ・強さが変わる、いきもの育成＆リアルタイムバトルゲームです。
 ブラウザだけで動くので、GitHub Pages に置けばスマホでもパソコンでも遊べます。
 
-![ゲーム画面](docs/screens.png)
+![ゲーム画面](screens.png)
 
 ## どんなゲーム？
 
@@ -19,12 +19,14 @@
 - **スマホ同士の対人戦** — 部屋番号かQRコードでつないでリアルタイム対戦。**対人戦で負けても死にません**。「みんな Lv.50」ルールも選べます。
 - ミニゲーム8種、とっくん（練習バトル）、ショップ、きせかえ、図鑑、クリア後の「ゆめのとう」。
 
-## GitHub Pages で公開する（ブラウザだけでできます）
+## GitHub Pages で公開する（スマホだけでもできます）
 
-1. GitHub にログインし、右上の「+」→「New repository」。名前を `hagukumi` などにして **Public** で「Create repository」。
+ファイルは全部ひとつの場所（フォルダ分けなし）に置く作りなので、スマホからでもそのまま上げられます。
+
+1. GitHub にログインし、「+」→「New repository」。名前を `hagukumi` などにして **Public** で「Create repository」。
 2. できたリポジトリのページで「uploading an existing file」（または「Add file」→「Upload files」）を押す。
-3. zip を**展開した中身**（`index.html`、`css`、`js`、`lib`、`icons`、`docs`、`manifest.webmanifest`、`sw.js`、`README.md` など）をまとめてドラッグ＆ドロップし、「Commit changes」。フォルダごとドラッグできます（一度に100ファイルまで。このゲームは30ファイルほどです）。
-4. リポジトリの「Settings」→ 左の「Pages」→「Build and deployment」の「Source」で **Deploy from a branch** を選び、ブランチを `main`、フォルダを `/(root)` にして「Save」。
+3. zip を展開して出てきた**ファイルを全部**選んでアップロードし、「Commit changes」（一度に100ファイルまで。このゲームは30ファイルほどです）。
+4. リポジトリの「Settings」→「Pages」→「Build and deployment」の「Source」で **Deploy from a branch** を選び、ブランチを `main`、フォルダを `/(root)` にして「Save」。
 5. 数分待つと `https://ユーザー名.github.io/hagukumi/` で遊べます（Pages の画面の上にURLが出ます）。
 
 ### スマホで遊ぶ
@@ -35,7 +37,7 @@
 
 ### 更新するとき
 
-ファイルを同じ名前で上書きアップロードしてください。古い版が残るときは、`sw.js` の `CACHE` の名前（`hagukumi-v1.0.0`）と `index.html` の `?v=1.0.0` を新しい番号に変えると、確実に新しい版に切り替わります。
+ファイルを同じ名前で上書きアップロードしてください。古い版が残るときは、`sw.js` の `CACHE` の名前（`hagukumi-v1.0.1`）と `index.html` の `?v=1.0.1` を新しい番号に変えると、確実に新しい版に切り替わります。
 
 ## 対人戦のやり方
 
@@ -72,33 +74,35 @@
 
 ```
 index.html            ページ本体
-css/style.css         見た目
-js/core.js            共通の道具（保存・色・DOM）
-js/data.js            タイプ相性・食べ物・技・ストーリー・敵のデータ
-js/art.js             いきものの絵を SVG で組み立てる（姿の変化）
-js/pet.js             お世話・時間経過・進化・ステータス
-js/screens.js         画面（おうち・ステータス・ぼうけん・ずかん…）
-js/minigames.js       ミニゲーム8種
-js/battle.js          バトルの仕組み（技・当たり判定・敵AI・描画）
-js/battle-ui.js       バトル画面と流れ
-js/net.js             対人戦（部屋・通信）
-js/audio.js           効果音とBGM（その場で音を作るので音声ファイルなし）
-js/main.js            起動と毎秒の処理
-lib/                  PeerJS と QRコード生成（MITライセンス）
-sw.js, manifest.webmanifest, icons/   ホーム画面に追加できるようにするためのファイル
-tools/make-icons.js   アイコン作り直し用（Node.js、遊ぶには不要）
+style.css             見た目
+core.js               共通の道具（保存・色・DOM）
+data.js               タイプ相性・食べ物・技・ストーリー・敵のデータ
+art.js                いきものの絵を SVG で組み立てる（姿の変化）
+pet.js                お世話・時間経過・進化・ステータス
+screens.js            画面（おうち・ステータス・ぼうけん・ずかん…）
+minigames.js          ミニゲーム8種
+battle.js             バトルの仕組み（技・当たり判定・敵AI・描画）
+battle-ui.js          バトル画面と流れ
+net.js                対人戦（部屋・通信）
+audio.js              効果音とBGM（その場で音を作るので音声ファイルなし）
+main.js               起動と毎秒の処理
+ui.js                 ダイアログなどの部品
+peerjs.min.js         通信ライブラリ PeerJS（MITライセンス）
+qrcode.js             QRコード生成（MITライセンス）
+sw.js, manifest.webmanifest, *.png   ホーム画面に追加できるようにするためのファイルとアイコン
+make-icons.js, build-single.js       作り直し用の道具（Node.js、遊ぶには不要）
 ```
 
 ## 改造のヒント
 
-- 技・食べ物・敵・ストーリーの文章はすべて `js/data.js` にあります。
-- 難しさは `js/battle.js` の先頭近くの `HG.BAL`（ダメージ全体・ボスの体力・ボスの攻撃力）で調整できます。
-- お世話の厳しさ（おなかの減り方など）は `js/pet.js` の `tick` にあります。
+- 技・食べ物・敵・ストーリーの文章はすべて `data.js` にあります。
+- 難しさは `battle.js` の先頭近くの `HG.BAL`（ダメージ全体・ボスの体力・ボスの攻撃力）で調整できます。
+- お世話の厳しさ（おなかの減り方など）は `pet.js` の `tick` にあります。
 - `index.html?debug=1&ff=5` で開くと時間を5時間進められます（テスト用）。
 
 ## クレジット
 
-- 通信：PeerJS（MIT License、`lib/LICENSE-peerjs.txt`）
-- QRコード：qrcode-generator by Kazuhiko Arase（MIT License、`lib/qrcode.js` 内に記載）。QRコードは株式会社デンソーウェーブの登録商標です。
+- 通信：PeerJS（MIT License、`LICENSE-peerjs.txt`）
+- QRコード：qrcode-generator by Kazuhiko Arase（MIT License、`qrcode.js` 内に記載）。QRコードは株式会社デンソーウェーブの登録商標です。
 - フォント：Dela Gothic One、Zen Maru Gothic（Google Fonts、SIL Open Font License）
 - 絵・音・ゲームの中身はこのリポジトリ用に作ったオリジナルです。
