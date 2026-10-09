@@ -261,7 +261,8 @@
   };
 
   // ───────── じかんの けいか ─────────
-  P.simulate = function (save, now) {
+  // live: アプリを ひらいて みている あいだ（よるでも かってには ねない）
+  P.simulate = function (save, now, live) {
     const pet = save.pet;
     const ev = [];
     if (!pet || pet.stage < 1 || pet.dead) return ev;
@@ -286,19 +287,26 @@
     if (now - t > MAXGAP) t = now - MAXGAP;
     while (t < now && !pet.dead) {
       const dt = Math.min(MIN, now - t);
-      tick(save, pet, t, dt, ev);
+      tick(save, pet, t, dt, ev, live);
       t += dt;
     }
     pet.lastTick = now;
     return ev;
   };
 
-  function tick(save, pet, t, dt, ev) {
+  // おせわの きびしさ（1じかん あたり）
+  // まる1日（24じかん）ほど ほうっておくと しぬ。1日2かいの おせわなら あんしん。
+  HG.CARE = {
+    hungerAwake: 5.5, hungerAsleep: 2, moodAwake: 3.5, moodAsleep: 0.5,
+    drainHungry: 4, drainHunger: 25, drainMood: 4, drainClean: 2, drainSick: 3, sleepDrainMul: 1,
+  };
+  function tick(save, pet, t, dt, ev, live) {
+    const C = HG.CARE;
     const h = dt / H;
     if (pet.asleep) {
       pet.sleepy -= 15 * h;
-      pet.hunger -= 0.8 * h;
-      pet.mood -= 0.3 * h;
+      pet.hunger -= C.hungerAsleep * h;
+      pet.mood -= C.moodAsleep * h;
       pet.clean -= 0.5 * h;
       // ねている あいだは よばない（おせわミスの とけいも とめる）
       for (const k in pet.alerts || {}) if (pet.alerts[k]) pet.alerts[k] += dt;
@@ -314,8 +322,8 @@
       if (t >= pet.nextPoopAt) pet.nextPoopAt = t + 20 * MIN;
     } else {
       pet.sleepy += 5.5 * h;
-      pet.hunger -= 5 * h;
-      let md = 3.5;
+      pet.hunger -= C.hungerAwake * h;
+      let md = C.moodAwake;
       if (pet.hunger < 20) md += 2;
       if (pet.poops.length > 2) md += 1 * (pet.poops.length - 2);
       if (pet.sick) md += 2;
@@ -339,6 +347,11 @@
         pet.dozed = true;
         pet.mood -= 8;
         ev.push({ t, kind: 'dozed' });
+      } else if (!live && P.isLate(t)) {
+        // だれも いない よる（23じ〜）は、ひとりで ねる
+        pet.asleep = true;
+        pet.dozed = false;
+        ev.push({ t, kind: 'slept' });
       }
     }
     clampNeeds(pet);
@@ -360,12 +373,13 @@
     }
     // いのち
     let drain = 0;
-    if (pet.hunger <= 0) drain += 4;
-    if (pet.sick) drain += 2.5;
-    if (pet.mood <= 0) drain += 1;
-    if (pet.clean <= 0) drain += 1;
-    if (pet.asleep) drain *= 0.5;
-    const regen = pet.sick || pet.hunger <= 0 ? 0 : pet.hunger > 30 && pet.mood > 15 ? 3 : 1.5;
+    if (pet.hunger <= 0) drain += C.drainHunger;
+    else if (pet.hunger < 15) drain += C.drainHungry;
+    if (pet.sick) drain += C.drainSick;
+    if (pet.mood <= 0) drain += C.drainMood;
+    if (pet.clean <= 0) drain += C.drainClean;
+    if (pet.asleep) drain *= C.sleepDrainMul;
+    const regen = pet.sick || pet.hunger <= 0 || (C.drainHungry && pet.hunger < 15) ? 0 : pet.hunger > 30 && pet.mood > 15 ? 3 : 1.5;
     pet.life = U.clamp(pet.life + (regen - drain) * h, 0, 100);
     // おせわミス（ねている あいだは よばない）
     if (!pet.asleep) {
@@ -398,6 +412,10 @@
   P.isNight = (t) => {
     const hr = new Date(t).getHours();
     return hr >= 21 || hr < 6;
+  };
+  P.isLate = (t) => {
+    const hr = new Date(t).getHours();
+    return hr >= 23 || hr < 6;
   };
   function clampNeeds(pet) {
     ['hunger', 'mood', 'clean', 'sleepy', 'bond', 'disc'].forEach((k) => (pet[k] = U.clamp(pet[k], 0, 100)));
@@ -605,7 +623,7 @@
   P.sleep = function (save) {
     const pet = save.pet;
     if (pet.asleep) return R(false, 'もう ねているよ');
-    if (pet.sleepy < 25) return R(false, 'まだ ねむくない みたい');
+    if (pet.sleepy < 25 && !P.isNight(HG.clock.now())) return R(false, 'まだ ねむくない みたい');
     pet.asleep = true;
     pet.dozed = false;
     pet.mood += 3;
@@ -616,7 +634,7 @@
     const pet = save.pet;
     if (!pet.asleep) return R(false, 'おきているよ');
     pet.asleep = false;
-    if (pet.sleepy > 40) {
+    if (pet.sleepy > 40 && pet.hunger >= 30) {
       pet.mood -= 10;
       clampNeeds(pet);
       return R(true, 'まだ ねむいのに…', { grumpy: true });

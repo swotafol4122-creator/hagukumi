@@ -58,7 +58,7 @@
         else p.inBattle = null;
       }
       awayMs = now - (p.lastTick || now);
-      awayEv = P.simulate(s, now);
+      awayEv = P.simulate(s, now, awayMs < 10 * 60e3);
       if (p.dead) {
         resume = null;
         p.inBattle = null;
@@ -106,7 +106,7 @@
       if (!HG.state.inBattle && !HG.state.busy && !document.querySelector('.full')) S.death();
       return;
     }
-    const ev = P.simulate(s, HG.clock.now());
+    const ev = P.simulate(s, HG.clock.now(), !document.hidden && HG.clock.now() - (p.lastTick || 0) < 5 * 60e3);
     if (p.dead) {
       P.persist();
       if (!HG.state.inBattle && !HG.state.busy) S.death();
@@ -142,7 +142,7 @@
       const away = Date.now() - hiddenAt;
       hiddenAt = 0;
       if (!p || p.stage < 1 || p.dead) return;
-      const ev = P.simulate(s, HG.clock.now());
+      const ev = P.simulate(s, HG.clock.now(), away < 10 * 60e3);
       P.persist();
       if (p.dead) {
         if (!HG.state.inBattle) S.death();
