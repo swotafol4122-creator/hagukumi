@@ -632,7 +632,7 @@
           if (st && !st.ready) line = 'レベルは じゅうぶん！ あと ' + U.fmtDur(st.wait) + ' たつと しんかするよ。';
           evo.appendChild(h('h3', {}, 'つぎの しんか'));
           evo.appendChild(h('p', { style: { margin: '0 0 4px' } }, line));
-          evo.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, 'いまの そだてかただと… ' + HG.TYPES[pr.type].name + 'タイプ・' + HG.STYLES[pr.style].name + ' すがたに なりそう'));
+          evo.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, 'いまの そだてかただと… ' + HG.TYPES[pr.type].name + 'タイプ' + (p.type === 'dark' ? '（やみは もう もどらない）' : '') + '・' + HG.STYLES[pr.style].name + ' すがたに なりそう'));
         }
         b.appendChild(evo);
         // のうりょく
@@ -685,26 +685,10 @@
         if (!ml.length) mcard.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, p.mistakes ? 'きろくは まだ ないよ（v1.0.3 から のこるように なったよ）' : 'まだ いちども ないよ。すごい！'));
         ml.forEach((m) => mcard.appendChild(h('p', { class: 'small', style: { margin: 0 } }, U.fmtTime(m.t) + '　' + (P.MISTAKE_TEXT[m.key] || m.key))));
         if (p.stage >= 2 && p.prev && p.prev.dark) mcard.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, 'まえの だんかい：' + S.darkLine(p.prev, Math.round(p.prev.dark))));
-        mcard.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, 'おなか・ごきげんが 0、びょうき、うんち 4こ いじょう を 15ふん ほうっておくと ミス（ねている あいだは かぞえない）。やみポイントが 30 いじょうで、ほかの タイプより おおいと やみタイプに なるよ。'));
+        mcard.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, 'おなか・ごきげんが 0、びょうき、うんち 4こ いじょう を 15ふん ほうっておくと ミス（ねている あいだは かぞえない）。やみポイントが 30 いじょうで、ほかの タイプより おおいと やみタイプに なるよ。いちど やみに なると、もう もどらない。'));
         b.appendChild(mcard);
       },
     });
-  };
-  // v1.0.3: まえの ばんの ふぐあいで やみに なった かもしれない子への おわび
-  S.darkFix = async function () {
-    const p = pet();
-    const to = P.retypeGuess(p);
-    const v = await UI.modal({
-      art: HG.art.creature(P.look(p), { uid: 'df', expr: 'sad' }),
-      title: 'ゲームの ふぐあいの おしらせ',
-      html: `<p>まえの バージョンでは、1日2かい ちゃんと おせわしても、うんちや びょうきで おせわミスが ふえすぎて、やみタイプに なりやすく なっていたよ（なおしたよ）。</p><p>${U.esc(p.name)} の タイプを、やみを のぞいた そだてかたで きめなおせるよ。</p>`,
-      buttons: [{ label: 'やみの まま', cls: 'white', value: 0 }, { label: HG.TYPES[to].name + 'タイプに なおす', cls: 'lime', value: 1 }],
-    });
-    if (v !== 1) return;
-    P.retype(save(), to);
-    persist();
-    S.render();
-    UI.toast(HG.TYPES[to].name + 'タイプに なったよ');
   };
   // やみポイントの うちわけ
   S.darkLine = function (acc, total) {
@@ -1013,7 +997,7 @@
           'ねむけが いっぱいに なると かってに ねむる。ねている あいだは あそべないので、よるに「ねる」で ねかせて あげよう。',
         ]);
         sec('すがたと タイプ', [
-          'しんかの とき、それまでの そだてかたで きまるよ。',
+          'しんかの とき、それまでの そだてかたで きまるよ。ただし いちど やみタイプに なると、もう もどらない。',
           'すがた：ままごと → かわいい、スポーツ → かっこいい、あたまの あそび → かしこい、バトル → たくましい。',
           'タイプ：おにく → ほのお、おさかな・おふろ → みず、サラダ → くさ、パチパチキャンディ → でんき、こんぺいとう・なでる・かんぺきな おせわ → ひかり。おせわミスが おおいと やみ。',
           ...HG.TYPE_HINT,

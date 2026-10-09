@@ -64,12 +64,13 @@
         p.inBattle = null;
       }
     }
-    const fixDark = s.migr < 103 && p && !p.dead && p.stage >= 2 && p.type === 'dark';
-    s.migr = 103;
+    // v1.0.3 で タイプを なおして しまった 子は、やみに もどす
+    const undone = (s.migr || 0) < 104 && P.undoRetype(s);
+    s.migr = 104;
     P.persist();
     S.render();
     (async () => {
-      if (fixDark) await S.darkFix();
+      if (undone) UI.toast('やみタイプに もどしたよ（やみは もう もどらない）');
       if (resume) {
         HG.state.busy = true;
         await UI.modal({ title: 'バトルの つづき', html: `<p>バトルの とちゅうで とじたので、つづきから たたかうよ。HPは とじた ときの まま。</p>`, buttons: [{ label: 'たたかう', cls: 'pink', value: 1 }] });
@@ -90,7 +91,7 @@
     }
     // QRコードから きたとき
     const room = new URLSearchParams(location.search).get('room');
-    if (room && !resume && !fixDark && s.pet && s.pet.stage >= 1 && !s.pet.dead) {
+    if (room && !resume && s.pet && s.pet.stage >= 1 && !s.pet.dead) {
       history.replaceState(null, '', location.pathname);
       HG.state.tab = 'pvp';
       S.main('pvp');

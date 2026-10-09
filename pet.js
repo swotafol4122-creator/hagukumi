@@ -23,7 +23,7 @@
       eggs: ['white', 'red', 'blue', 'green', 'yellow'],
       tower: { best: 0 },
       seenTutorial: false,
-      migr: 103,
+      migr: 104,
       pet: null,
     };
   };
@@ -729,33 +729,41 @@
     let best = null, bv = 0;
     for (const k of HG.ELEM_KEYS) if (el[k] > bv) { bv = el[k]; best = k; }
     let type;
-    if (dark >= 30 && dark >= bv) type = 'dark';
-    else if (bv < 4) type = pet.stage >= 2 && pet.type !== 'dark' ? pet.type : 'normal';
+    if (pet.type === 'dark' && pet.stage >= 2) type = 'dark'; // いちど やみに なると もどらない
+    else if (dark >= 30 && dark >= bv) type = 'dark';
+    else if (bv < 4) type = pet.stage >= 2 ? pet.type : 'normal';
     else type = best;
     let style = null, sv = 0;
     for (const k of HG.STYLE_KEYS) if (sp[k] > sv) { sv = sp[k]; style = k; }
     if (sv < 3) style = pet.stage >= 2 ? pet.style : 'cute';
     return { type, style, el, sp, dark };
   };
-  // やみを のぞいて、さいごの しんかの ときの そだてかたで タイプを きめなおす
-  P.retypeGuess = function (pet) {
-    const src = pet.prev && pet.prev.el ? pet.prev.el : pet.st.el;
-    let best = 'normal', bv = 3.999;
-    for (const k of HG.ELEM_KEYS) if ((src[k] || 0) > bv) { bv = src[k]; best = k; }
-    return best;
-  };
-  P.retype = function (save, type) {
+  // v1.0.3 の「タイプを なおす」で かえて しまった 子を、やみに もどす
+  P.undoRetype = function (save) {
     const pet = save.pet;
-    const old = pet.type;
-    if (old === type) return [];
-    pet.type = type;
-    const learned = P.learnAllUpTo(pet);
-    // いれていた まえの タイプの わざを、あたらしい タイプの わざと いれかえる
-    const pool = pet.moves.filter((id) => HG.MOVES[id].type === type && HG.MOVES[id].power > 0 && !pet.equip.includes(id));
-    pet.equip = pet.equip.map((id) => (id && HG.MOVES[id].type === old && pool.length ? pool.shift() : id));
-    P.registerForm(save);
-    P.log(pet, HG.TYPES[type].name + 'タイプに なおした');
-    return learned;
+    if (!pet || pet.dead || pet.type === 'dark' || !pet.log) return false;
+    const i = pet.log.findIndex((l) => /タイプに なおした$/.test(l.text || ''));
+    if (i < 0) return false;
+    const fixAt = pet.log[i].t;
+    const was = pet.type;
+    // なおした ときに ふえた すがたを、ずかんと きろくから けす
+    const k = HG.formKey(P.look(pet));
+    pet.forms = (pet.forms || []).filter((f) => f !== k);
+    if (save.dex[k] && Math.abs((save.dex[k].at || 0) - fixAt) < 60e3) delete save.dex[k];
+    pet.type = 'dark';
+    // なおす まえは しらなかった タイプの わざは わすれる
+    const known = new Set(pet.forms.map((f) => f.split('_')[1]));
+    const keepWas = known.has(was);
+    const pool = pet.moves.filter((id) => HG.MOVES[id] && HG.MOVES[id].type === 'dark' && HG.MOVES[id].power > 0 && !pet.equip.includes(id));
+    pet.equip = pet.equip.map((id) => (id && HG.MOVES[id] && HG.MOVES[id].type === was ? pool.shift() || (keepWas ? id : null) : id));
+    if (!keepWas) pet.moves = pet.moves.filter((id) => !HG.MOVES[id] || HG.MOVES[id].type !== was);
+    for (let j = 0; j < pet.equip.length; j++) {
+      if (pet.equip[j]) continue;
+      const m = pet.moves.find((id) => !pet.equip.includes(id));
+      if (m) pet.equip[j] = m;
+    }
+    pet.log.splice(i, 1);
+    return true;
   };
   P.evolve = function (save) {
     const pet = save.pet;
@@ -777,7 +785,7 @@
       normal: 'なんでも バランスよく そだったので ノーマルタイプに',
     };
     if (pet.stage === 2 || pet.type !== oldType) why.push(tr[pet.type]);
-    else why.push(HG.TYPES[pet.type].name + 'タイプの まま');
+    else why.push(HG.TYPES[pet.type].name + 'タイプの まま' + (pet.type === 'dark' ? '（いちど やみに なると もどらない）' : ''));
     if (pet.stage === 2 || pet.style !== oldStyle) why.push(HG.STYLES[pet.style].from + 'ので ' + HG.STYLES[pet.style].name + ' すがたに');
     else why.push(HG.STYLES[pet.style].name + ' すがたの まま');
     // ためた ポイントを ひきつぐ
