@@ -1,6 +1,6 @@
 /* ハグクミ sw.js — オフラインでも ひらけるように する */
-const CACHE = 'hagukumi-v1.0.5';
-const V = '?v=1.0.5';
+const CACHE = 'hagukumi-v1.0.6';
+const V = '?v=1.0.6';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest' + V, 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
 ].concat([

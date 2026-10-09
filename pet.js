@@ -295,10 +295,13 @@
   };
 
   // おせわの きびしさ（1じかん あたり）
-  // まる1日（24じかん）ほど ほうっておくと しぬ。1日2かいの おせわなら あんしん。
+  // おきている じかんで はんにち（12じかん）ほど ほうっておくと しぬ。
+  // よるは ねている あいだ おなかが へりにくい。あさ・ひる・よるの 3かいの おせわで あんしん。
+  // hungerAwake を さげると ながく いきる（5.5 で まる1日くらい）。
   HG.CARE = {
-    hungerAwake: 5.5, hungerAsleep: 2, moodAwake: 3.5, moodAsleep: 0.5,
-    drainHungry: 4, drainHunger: 25, drainMood: 4, drainClean: 2, drainSick: 3, sleepDrainMul: 1,
+    hungerAwake: 9.5, hungerAsleep: 1.2, moodAwake: 3.5, moodAsleep: 0.5,
+    drainHungry: 10, drainHunger: 45, drainMood: 4, drainClean: 2, drainSick: 3, sleepDrainMul: 1,
+    weightLoss: 0.5,
   };
   function tick(save, pet, t, dt, ev, live) {
     const C = HG.CARE;
@@ -332,7 +335,7 @@
       pet.clean -= 2 * h;
       // うごいて いると すこしずつ やせる
       const wMin = P.idealWeight(pet.stage) * 0.8;
-      if (pet.weight > wMin) pet.weight = Math.max(wMin, pet.weight - 0.12 * h);
+      if (pet.weight > wMin) pet.weight = Math.max(wMin, pet.weight - C.weightLoss * h);
       if (t >= pet.nextPoopAt) {
         if (pet.poops.length < 8) {
           pet.poops.push({ id: U.uid(), x: U.rand(0.12, 0.88), y: U.rand(0, 1) });
