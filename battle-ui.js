@@ -221,12 +221,17 @@
     HG.state.inBattle = true;
     HG.state.busy = true;
     const lethal = opts.mode === 'story' && opts.lethal !== false;
-    pet.inBattle = { lethal, at: Date.now(), ch: opts.chapter, node: opts.node };
+    // とちゅうで アプリが とじても、つぎに ひらいた とき つづきから できるように のこす
+    const resume = opts.resume || null;
+    const keep = Object.assign({}, opts);
+    delete keep.resume;
+    pet.inBattle = { lethal, at: Date.now(), ch: opts.chapter, node: opts.node, opts: lethal ? JSON.parse(JSON.stringify(keep)) : null, snap: resume };
     P.persist();
     UI.closeAll();
     const b = new HG.Battle({ mode: opts.mode, arena: opts.arena });
     const spec = P.fighterSpec(s);
-    const me = b.addFighter(spec, 'A', { x: W / 2, y: H * 0.8, local: true, ctrl: 'input', canBurst: true, potions: Math.min(2, s.items.potion || 0) });
+    const me = b.addFighter(spec, 'A', { x: W / 2, y: H * 0.8, local: true, ctrl: 'input', canBurst: true, potions: Math.min(2, s.items.potion || 0), hp: resume ? Math.max(1, Math.round(spec.stats.hp * resume.me)) : undefined });
+    if (resume) me.potionUsed = resume.pot || 0;
     let aiLv = opts.mode === 'story' || opts.mode === 'tutorial' ? opts.chapter || 0 : Math.min(8, Math.floor(pet.level / 5));
     if (opts.mode === 'tower') aiLv = Math.min(9, 6 + Math.floor((opts.floor || 1) / 4));
     const foes = [];
@@ -234,7 +239,21 @@
     opts.enemies.forEach(([id, lv], i) => {
       const es = P.enemySpec(id, lv, { pair: n > 1 });
       const x = n === 1 ? W / 2 : W * (0.3 + (0.4 * i) / (n - 1));
-      const f = b.addFighter(es, 'B', { x, y: H * 0.22, ai: HG.AI.preset(aiLv, es.boss), mist: opts.mode === 'story' && !es.tame });
+      const rr = resume && resume.foes ? resume.foes[i] : null;
+      const f = b.addFighter(es, 'B', { x, y: H * 0.22, ai: HG.AI.preset(aiLv, es.boss), mist: opts.mode === 'story' && !es.tame, hp: rr != null ? Math.max(rr > 0 ? 1 : 0, Math.round(es.stats.hp * rr)) : undefined });
+      if (rr != null && rr <= 0) {
+        f.hp = 0;
+        f.dead = true;
+      } else if (rr != null && f.phases) {
+        // もう すぎた だんかいは、わざだけ ふやして えんしゅつは しない
+        f.phases.forEach((ph) => {
+          if (rr > ph.at) return;
+          ph.done = true;
+          f.phaseCdMul *= ph.cdMul || 1;
+          (ph.add || []).forEach((mid) => { if (!f.moves.some((m) => m.id === mid) && HG.MOVES[mid]) f.moves.push({ id: mid, def: HG.MOVES[mid], cd: 1.5 }); });
+          if (ph.dim) b.dimTarget = 0.55;
+        });
+      }
       f.face = Math.PI / 2;
       f.flip = -1;
       foes.push([f, HG.ENEMIES[id]]);
@@ -247,7 +266,15 @@
     hookSounds(b, me);
     await Promise.all([spriteFor(me, spec.look)].concat(foes.map(([f, d]) => spriteFor(f, d.look, d.art))));
     HG.audio.bgm(opts.boss || foes.some(([f]) => f.boss) ? 'boss' : 'battle');
-    let paused = false, running = false, ended = false, raf = 0;
+    let paused = false, running = false, ended = false, raf = 0, snapAt = 0, snapSaved = 0;
+    const snap = (t) => {
+      if (!lethal || ended || !s.pet || !s.pet.inBattle) return;
+      s.pet.inBattle.snap = { me: me.hp / me.maxHp, foes: foes.map(([f]) => (f.dead ? 0 : f.hp / f.maxHp)), pot: me.potionUsed };
+      if (t - snapSaved > 4000) {
+        snapSaved = t;
+        P.persist();
+      }
+    };
     // チュートリアル
     let tut = opts.mode === 'tutorial' ? 0 : -1;
     const tutText = ['ひだりしたを なぞって うごいてみよう', 'みぎの わざボタンで こうげき！', 'あかい はんいや たまが きたら「よける」！ よけている あいだは むてき', 'ゲージが たまったら「バースト」で パワーアップ！', 'その ちょうし！ たおしてみよう'];
@@ -273,7 +300,9 @@
       } else if (type === 'end') {
         if (ended) return;
         ended = true;
-        setTimeout(() => finish(d.winner === 'A'), 1300);
+        // けっかは すぐに きろくする（えんしゅつちゅうに とじても だいじょうぶ）
+        const st = settle(d.winner === 'A');
+        setTimeout(() => finish(d.winner === 'A', st), 1300);
       }
     });
     // ポーズ
@@ -300,26 +329,15 @@
       if (s.pet && s.pet.dead) return HG.screens.death();
       HG.screens.main(opts.mode === 'story' || opts.mode === 'tutorial' ? 'story' : 'home');
     }
-    async function finish(win) {
-      running = false;
-      cancelAnimationFrame(raf);
-      HG.audio.stopBgm();
+    function settle(win) {
+      if (s.pet) s.pet.inBattle = null;
       const mainFoe = foes[foes.length - 1][0];
       const enemyLv = Math.max(...opts.enemies.map((e) => e[1]));
       if (!win && lethal) {
-        // しんで しまう
-        HG.audio.sfx('lose');
         P.die(s, 'バトル', null, mainFoe.name);
         P.persist();
-        await U.sleep(600);
-        state.cleanupInput();
-        ui.full.close();
-        HG.state.inBattle = false;
-        HG.state.busy = false;
-        HG.screens.death();
-        return;
+        return { dead: true };
       }
-      HG.audio.sfx(win ? 'win' : 'lose');
       let res = { xp: 0, coins: 0, lv: null };
       if (opts.mode === 'tower') {
         if (win) {
@@ -330,7 +348,27 @@
       } else if (opts.mode === 'tutorial') {
         res = win ? P.applyBattle(s, { mode: 'tutorial', win }) : res;
       } else res = P.applyBattle(s, { mode: opts.mode, win, enemyLv, boss: !!opts.boss });
+      const story = (opts.mode === 'story' || opts.mode === 'tutorial') && win ? HG.screens.storyAdvance(opts.chapter, opts.node) : null;
       P.persist();
+      return { res, story };
+    }
+    async function finish(win, st) {
+      running = false;
+      cancelAnimationFrame(raf);
+      HG.audio.stopBgm();
+      if (st.dead) {
+        // しんで しまう
+        HG.audio.sfx('lose');
+        await U.sleep(600);
+        state.cleanupInput();
+        ui.full.close();
+        HG.state.inBattle = false;
+        HG.state.busy = false;
+        HG.screens.death();
+        return;
+      }
+      HG.audio.sfx(win ? 'win' : 'lose');
+      const res = st.res;
       // けっか
       const card = h('div', { class: 'mg-dom', style: { background: 'rgba(255,253,245,.95)', alignItems: 'center', justifyContent: 'center', textAlign: 'center', zIndex: 20 } },
         h('div', { style: { width: '130px', height: '130px' }, html: HG.art.creature(spec.look, { uid: 'res', expr: win ? 'happy' : 'sad', cls: win ? 'anim-hop' : '' }) }),
@@ -341,9 +379,8 @@
       ui.stage.appendChild(card);
       await new Promise((rs) => (card.querySelector('button').onclick = rs));
       HG.audio.sfx('tap');
-      const wasStory = (opts.mode === 'story' || opts.mode === 'tutorial') && win;
       cleanup();
-      if (wasStory) await HG.screens.storyWin(opts.chapter, opts.node);
+      if (st.story && st.story.done) await HG.screens.storyOutro(opts.chapter);
       if (res.lv) HG.screens.afterXp(res.lv);
       if (s.pet && !s.pet.dead) HG.screens.main(opts.mode === 'story' || opts.mode === 'tutorial' ? 'story' : 'home');
     }
@@ -352,6 +389,8 @@
     r.draw({ lock: me.target });
     await countdown(ui);
     running = true;
+    // つづきからで、もう あいてが ぜんぶ たおれていた とき
+    if (resume && foes.every(([f]) => f.dead)) b.finish('A');
     let last = performance.now(), acc = 0;
     const frame = (t) => {
       if (!running) return;
@@ -367,8 +406,13 @@
       }
       r.draw({ lock: b.targetOf(me) });
       updateHud(ui, b, me, state);
+      if (t - snapAt > 1000) {
+        snapAt = t;
+        snap(t);
+      }
       raf = requestAnimationFrame(frame);
     };
+    if (resume) banner(ui, 'つづきから！', 2200);
     raf = requestAnimationFrame(frame);
   };
 

@@ -23,12 +23,14 @@
       eggs: ['white', 'red', 'blue', 'green', 'yellow'],
       tower: { best: 0 },
       seenTutorial: false,
+      migr: 103,
       pet: null,
     };
   };
   P.load = function () {
     const s = HG.store.get(SAVE_KEY);
     if (!s || s.v !== 1) return P.newSave();
+    if (s.migr === undefined) s.migr = 0; // v1.0.2 までの データ
     // あとから ふえた こうもくを おぎなう
     const d = P.newSave();
     for (const k in d) if (s[k] === undefined) s[k] = d[k];
@@ -70,7 +72,7 @@
     return save.pet;
   };
   function freshAcc() {
-    return { el: { fire: 0, water: 0, grass: 0, elec: 0, light: 0 }, dark: 0, styleP: { cute: 0, cool: 0, smart: 0, tough: 0 }, mistakes: 0 };
+    return { el: { fire: 0, water: 0, grass: 0, elec: 0, light: 0 }, dark: 0, styleP: { cute: 0, cool: 0, smart: 0, tough: 0 }, mistakes: 0, why: {} };
   }
   P.hatch = function (save, name) {
     const pet = save.pet;
@@ -295,33 +297,41 @@
     const h = dt / H;
     if (pet.asleep) {
       pet.sleepy -= 15 * h;
-      pet.hunger -= 1.2 * h;
-      pet.mood -= 0.6 * h;
+      pet.hunger -= 0.8 * h;
+      pet.mood -= 0.3 * h;
       pet.clean -= 0.5 * h;
+      // ねている あいだは よばない（おせわミスの とけいも とめる）
+      for (const k in pet.alerts || {}) if (pet.alerts[k]) pet.alerts[k] += dt;
+      // よる（21じ〜6じ）は ねむけが なくなっても あさまで ねている
       if (pet.sleepy <= 0) {
         pet.sleepy = 0;
-        pet.asleep = false;
-        pet.dozed = false;
-        ev.push({ t, kind: 'woke' });
+        if (!P.isNight(t)) {
+          pet.asleep = false;
+          pet.dozed = false;
+          ev.push({ t, kind: 'woke' });
+        }
       }
       if (t >= pet.nextPoopAt) pet.nextPoopAt = t + 20 * MIN;
     } else {
-      pet.sleepy += 6 * h;
-      pet.hunger -= 5.5 * h;
-      let md = 4.5;
-      if (pet.hunger < 20) md += 3;
-      if (pet.poops.length > 2) md += 1.5 * (pet.poops.length - 2);
-      if (pet.sick) md += 3;
-      if (pet.clean < 30) md += 1.5;
+      pet.sleepy += 5.5 * h;
+      pet.hunger -= 5 * h;
+      let md = 3.5;
+      if (pet.hunger < 20) md += 2;
+      if (pet.poops.length > 2) md += 1 * (pet.poops.length - 2);
+      if (pet.sick) md += 2;
+      if (pet.clean < 30) md += 1;
       pet.mood -= md * h;
       pet.clean -= 2 * h;
+      // うごいて いると すこしずつ やせる
+      const wMin = P.idealWeight(pet.stage) * 0.8;
+      if (pet.weight > wMin) pet.weight = Math.max(wMin, pet.weight - 0.12 * h);
       if (t >= pet.nextPoopAt) {
         if (pet.poops.length < 8) {
           pet.poops.push({ id: U.uid(), x: U.rand(0.12, 0.88), y: U.rand(0, 1) });
           ev.push({ t, kind: 'poop' });
         }
         pet.clean -= 10;
-        pet.nextPoopAt = t + U.rand(3, 4.5) * H;
+        pet.nextPoopAt = t + U.rand(4.5, 6) * H;
       }
       if (pet.sleepy >= 100) {
         pet.sleepy = 100;
@@ -334,7 +344,7 @@
     clampNeeds(pet);
     // びょうき
     if (!pet.sick) {
-      let r = 0.004;
+      let r = 0.003;
       r += 0.025 * Math.max(0, pet.poops.length - 2);
       if (pet.clean < 25) r += 0.04;
       if (pet.hunger < 10) r += 0.03;
@@ -357,11 +367,13 @@
     if (pet.asleep) drain *= 0.5;
     const regen = pet.sick || pet.hunger <= 0 ? 0 : pet.hunger > 30 && pet.mood > 15 ? 3 : 1.5;
     pet.life = U.clamp(pet.life + (regen - drain) * h, 0, 100);
-    // おせわミス
-    alert(save, pet, 'hunger', pet.hunger <= 0, t, ev);
-    alert(save, pet, 'mood', pet.mood <= 0, t, ev);
-    alert(save, pet, 'sick', pet.sick, t, ev);
-    alert(save, pet, 'poop', pet.poops.length >= 4, t, ev);
+    // おせわミス（ねている あいだは よばない）
+    if (!pet.asleep) {
+      alert(save, pet, 'hunger', pet.hunger <= 0, t, ev);
+      alert(save, pet, 'mood', pet.mood <= 0, t, ev);
+      alert(save, pet, 'sick', pet.sick, t, ev);
+      alert(save, pet, 'poop', pet.poops.length >= 4, t, ev);
+    }
     // かんぺきな おせわ → ひかり
     if (pet.hunger > 50 && pet.mood > 50 && pet.clean > 50 && !pet.sick && pet.poops.length === 0) pet.st.el.light += 0.6 * h;
     // わがまま
@@ -383,6 +395,10 @@
       ev.push({ t, kind: 'death', cause });
     }
   }
+  P.isNight = (t) => {
+    const hr = new Date(t).getHours();
+    return hr >= 21 || hr < 6;
+  };
   function clampNeeds(pet) {
     ['hunger', 'mood', 'clean', 'sleepy', 'bond', 'disc'].forEach((k) => (pet[k] = U.clamp(pet[k], 0, 100)));
     pet.weight = Math.max(1, pet.weight);
@@ -401,7 +417,7 @@
       const should = since >= 15 * MIN ? 1 + Math.floor((since - 15 * MIN) / (12 * H)) : 0;
       while (pet.counted[key] < should) {
         pet.counted[key]++;
-        P.mistake(pet, key);
+        P.mistake(pet, key, t);
         ev.push({ t, kind: 'mistake', key });
       }
     } else if (pet.alerts[key]) {
@@ -409,10 +425,18 @@
       pet.counted[key] = 0;
     }
   }
-  P.mistake = function (pet, key) {
+  P.MISTAKE_SHORT = { hunger: 'おなか', mood: 'ごきげん', sick: 'びょうき', poop: 'うんち', flee: 'にげた' };
+  P.MISTAKE_TEXT = { hunger: 'おなかが ぺこぺこの まま', mood: 'ごきげんが 0の まま', sick: 'びょうきの まま', poop: 'うんちが 4こ いじょう', flee: 'バトルの とちゅうで いなくなった' };
+  P.why = (pet) => (pet.st.why = pet.st.why || {});
+  P.mistake = function (pet, key, t) {
     pet.mistakes++;
     pet.st.mistakes++;
     pet.st.dark += 10;
+    const w = P.why(pet);
+    w[key] = (w[key] || 0) + 1;
+    pet.mlog = pet.mlog || [];
+    pet.mlog.push({ t: t || HG.clock.now(), key });
+    if (pet.mlog.length > 30) pet.mlog.shift();
     pet.bond = Math.max(0, pet.bond - 4);
   };
 
@@ -574,6 +598,7 @@
     pet.mood -= 15;
     pet.bond -= 6;
     pet.st.dark += 4;
+    P.why(pet).scold = (P.why(pet).scold || 0) + 1;
     clampNeeds(pet);
     return R(true, 'なにも してないのに…。かなしそう', { fair: false });
   };
@@ -592,8 +617,7 @@
     if (!pet.asleep) return R(false, 'おきているよ');
     pet.asleep = false;
     if (pet.sleepy > 40) {
-      pet.mood -= 15;
-      pet.st.dark += 2;
+      pet.mood -= 10;
       clampNeeds(pet);
       return R(true, 'まだ ねむいのに…', { grumpy: true });
     }
@@ -706,12 +730,32 @@
     for (const k of HG.ELEM_KEYS) if (el[k] > bv) { bv = el[k]; best = k; }
     let type;
     if (dark >= 30 && dark >= bv) type = 'dark';
-    else if (bv < 4) type = pet.stage >= 2 ? pet.type : 'normal';
+    else if (bv < 4) type = pet.stage >= 2 && pet.type !== 'dark' ? pet.type : 'normal';
     else type = best;
     let style = null, sv = 0;
     for (const k of HG.STYLE_KEYS) if (sp[k] > sv) { sv = sp[k]; style = k; }
     if (sv < 3) style = pet.stage >= 2 ? pet.style : 'cute';
     return { type, style, el, sp, dark };
+  };
+  // やみを のぞいて、さいごの しんかの ときの そだてかたで タイプを きめなおす
+  P.retypeGuess = function (pet) {
+    const src = pet.prev && pet.prev.el ? pet.prev.el : pet.st.el;
+    let best = 'normal', bv = 3.999;
+    for (const k of HG.ELEM_KEYS) if ((src[k] || 0) > bv) { bv = src[k]; best = k; }
+    return best;
+  };
+  P.retype = function (save, type) {
+    const pet = save.pet;
+    const old = pet.type;
+    if (old === type) return [];
+    pet.type = type;
+    const learned = P.learnAllUpTo(pet);
+    // いれていた まえの タイプの わざを、あたらしい タイプの わざと いれかえる
+    const pool = pet.moves.filter((id) => HG.MOVES[id].type === type && HG.MOVES[id].power > 0 && !pet.equip.includes(id));
+    pet.equip = pet.equip.map((id) => (id && HG.MOVES[id].type === old && pool.length ? pool.shift() : id));
+    P.registerForm(save);
+    P.log(pet, HG.TYPES[type].name + 'タイプに なおした');
+    return learned;
   };
   P.evolve = function (save) {
     const pet = save.pet;

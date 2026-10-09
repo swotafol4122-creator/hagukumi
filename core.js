@@ -2,7 +2,7 @@
 'use strict';
 window.HG = window.HG || {};
 (function (HG) {
-  HG.VERSION = '1.0.2';
+  HG.VERSION = '1.0.3';
   HG.DEBUG = /[?&]debug=1/.test(location.search);
 
   const U = HG.util = {};
@@ -50,6 +50,11 @@ window.HG = window.HG || {};
     String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // 時間の表示（ゲーム内はひらがな中心）
+  U.fmtTime = (t) => {
+    const d = new Date(t);
+    const z = (n) => String(n).padStart(2, '0');
+    return d.getMonth() + 1 + '/' + d.getDate() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+  };
   U.fmtDur = (ms) => {
     const m = Math.max(0, Math.round(ms / 60000));
     if (m < 60) return m + 'ふん';

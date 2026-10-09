@@ -50,26 +50,37 @@
     HG.save = P.load();
     const s = HG.save, p = s.pet;
     const now = HG.clock.now();
-    let awayEv = null, awayMs = 0, fled = null;
+    let awayEv = null, awayMs = 0, resume = null;
     if (p && p.stage >= 1 && !p.dead) {
       if (p.inBattle) {
-        // バトルの とちゅうで とじた
-        if (p.inBattle.lethal) {
-          fled = p.inBattle;
-          p.bond = Math.max(0, p.bond - 20);
-          p.mood = Math.max(0, p.mood - 30);
-          for (let i = 0; i < 3; i++) P.mistake(p, 'flee');
-        }
-        p.inBattle = null;
+        // ストーリーの バトルの とちゅうで とじた → つづきから（にげた ことには しない）
+        if (p.inBattle.lethal && p.inBattle.opts) resume = p.inBattle;
+        else p.inBattle = null;
       }
       awayMs = now - (p.lastTick || now);
       awayEv = P.simulate(s, now);
+      if (p.dead) {
+        resume = null;
+        p.inBattle = null;
+      }
     }
+    const fixDark = s.migr < 103 && p && !p.dead && p.stage >= 2 && p.type === 'dark';
+    s.migr = 103;
     P.persist();
     S.render();
-    if (fled) {
-      UI.modal({ title: 'たたかいから にげだした…', html: `<p>バトルの とちゅうで いなくなったので、${U.esc(p.name)} は ひとりで にげかえって きた。こころに きずが のこった みたい。</p><p class="muted">なかよし −20・おせわミス ＋3</p>`, buttons: [{ label: 'ごめんね', cls: 'white', value: 1 }] });
-    } else if (awayEv && awayMs > 10 * 60e3) S.showAway(awayEv, awayMs);
+    (async () => {
+      if (fixDark) await S.darkFix();
+      if (resume) {
+        HG.state.busy = true;
+        await UI.modal({ title: 'バトルの つづき', html: `<p>バトルの とちゅうで とじたので、つづきから たたかうよ。HPは とじた ときの まま。</p>`, buttons: [{ label: 'たたかう', cls: 'pink', value: 1 }] });
+        HG.state.busy = false;
+        if (s.pet && !s.pet.dead) HG.battleUI.start(Object.assign({}, resume.opts, { resume: resume.snap || { me: 1, foes: null, pot: 0 } }));
+        else if (s.pet) {
+          s.pet.inBattle = null;
+          P.persist();
+        }
+      } else if (awayEv && awayMs > 10 * 60e3) S.showAway(awayEv, awayMs);
+    })();
 
     document.addEventListener('pointerdown', () => HG.audio.unlock(), { capture: true });
     document.addEventListener('keydown', () => HG.audio.unlock(), { capture: true });
@@ -79,7 +90,7 @@
     }
     // QRコードから きたとき
     const room = new URLSearchParams(location.search).get('room');
-    if (room && s.pet && s.pet.stage >= 1 && !s.pet.dead) {
+    if (room && !resume && !fixDark && s.pet && s.pet.stage >= 1 && !s.pet.dead) {
       history.replaceState(null, '', location.pathname);
       HG.state.tab = 'pvp';
       S.main('pvp');
@@ -99,6 +110,10 @@
       P.persist();
       if (!HG.state.inBattle && !HG.state.busy) S.death();
       return;
+    }
+    const miss = ev.filter((e) => e.kind === 'mistake');
+    if (miss.length && !document.hidden && !HG.state.inBattle) {
+      UI.toast('おせわミス…（' + [...new Set(miss.map((e) => P.MISTAKE_SHORT[e.key] || e.key))].join('・') + '）');
     }
     if (ev.some((e) => e.kind === 'call' || e.kind === 'whim' || e.kind === 'sick')) {
       if (!document.hidden && !HG.state.inBattle && Date.now() - lastBeep > 20000) {

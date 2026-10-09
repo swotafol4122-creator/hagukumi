@@ -674,13 +674,46 @@
           h('dt', {}, 'なかよし'), h('dd', {}, Math.round(p.bond) + ' / 100' + (p.bond >= 90 ? '（ピンチで ふんばるかも）' : '')),
           h('dt', {}, 'しつけ'), h('dd', {}, Math.round(p.disc) + ' / 100' + (p.disc < 25 ? '（バトルで いうことを きかない ことが ある）' : '')),
           h('dt', {}, 'おせわミス'), h('dd', {}, 'この だんかい ' + p.st.mistakes + '　ぜんぶで ' + p.mistakes),
+          h('dt', {}, 'やみポイント'), h('dd', {}, S.darkLine(p.st, Math.round(pr.dark))),
           h('dt', {}, 'たいじゅう'), h('dd', {}, Math.round(p.weight) + 'g（ちょうどいい のは ' + P.idealWeight(p.stage) + 'g くらい）'),
           h('dt', {}, 'ねんれい'), h('dd', {}, Math.floor(P.age(p) / 86400e3) + 'さい（' + U.fmtDur(P.age(p)) + '）'),
           h('dt', {}, 'バトル'), h('dd', {}, p.wins + 'しょう / ' + p.battles + 'かい')
         ));
-        b.appendChild(memo);
+        // おせわミスの きろく
+        const ml = (p.mlog || []).slice(-6).reverse();
+        const mcard = h('div', { class: 'card flat gap' }, h('h3', {}, 'おせわミスの きろく'));
+        if (!ml.length) mcard.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, p.mistakes ? 'きろくは まだ ないよ（v1.0.3 から のこるように なったよ）' : 'まだ いちども ないよ。すごい！'));
+        ml.forEach((m) => mcard.appendChild(h('p', { class: 'small', style: { margin: 0 } }, U.fmtTime(m.t) + '　' + (P.MISTAKE_TEXT[m.key] || m.key))));
+        if (p.stage >= 2 && p.prev && p.prev.dark) mcard.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, 'まえの だんかい：' + S.darkLine(p.prev, Math.round(p.prev.dark))));
+        mcard.appendChild(h('p', { class: 'muted', style: { margin: 0 } }, 'おなか・ごきげんが 0、びょうき、うんち 4こ いじょう を 15ふん ほうっておくと ミス（ねている あいだは かぞえない）。やみポイントが 30 いじょうで、ほかの タイプより おおいと やみタイプに なるよ。'));
+        b.appendChild(mcard);
       },
     });
+  };
+  // v1.0.3: まえの ばんの ふぐあいで やみに なった かもしれない子への おわび
+  S.darkFix = async function () {
+    const p = pet();
+    const to = P.retypeGuess(p);
+    const v = await UI.modal({
+      art: HG.art.creature(P.look(p), { uid: 'df', expr: 'sad' }),
+      title: 'ゲームの ふぐあいの おしらせ',
+      html: `<p>まえの バージョンでは、1日2かい ちゃんと おせわしても、うんちや びょうきで おせわミスが ふえすぎて、やみタイプに なりやすく なっていたよ（なおしたよ）。</p><p>${U.esc(p.name)} の タイプを、やみを のぞいた そだてかたで きめなおせるよ。</p>`,
+      buttons: [{ label: 'やみの まま', cls: 'white', value: 0 }, { label: HG.TYPES[to].name + 'タイプに なおす', cls: 'lime', value: 1 }],
+    });
+    if (v !== 1) return;
+    P.retype(save(), to);
+    persist();
+    S.render();
+    UI.toast(HG.TYPES[to].name + 'タイプに なったよ');
+  };
+  // やみポイントの うちわけ
+  S.darkLine = function (acc, total) {
+    const w = acc.why || {};
+    const parts = [];
+    Object.keys(P.MISTAKE_SHORT).forEach((k) => { if (w[k]) parts.push(P.MISTAKE_SHORT[k] + '×' + w[k]); });
+    if (w.scold) parts.push('いらない しかる×' + w.scold);
+    if (!parts.length && acc.mistakes) parts.push('おせわミス×' + acc.mistakes);
+    return total + (parts.length ? '（' + parts.join('・') + '）' : '');
   };
   S.movePicker = function (slot, after) {
     const p = pet();
@@ -973,9 +1006,10 @@
         const sec = (t, lines) => b.appendChild(h('div', { class: 'card flat gap' }, h('h3', {}, t), ...lines.map((l) => h('p', { style: { margin: 0 }, class: 'small' }, l))));
         sec('おせわ', [
           'おなか・ごきげん・せいけつ・ねむけ を みて おせわしよう。あさと よる、1日2かい みてあげれば あんしん。',
-          'ほうっておくと「おせわミス」が ふえて、からだが よわっていく。いのちが 0に なると しんで しまうよ。',
+          'おなかや ごきげんが 0、びょうき、うんち 4こ いじょう を 15ふん ほうっておくと「おせわミス」。ミスが つづくと からだが よわって、やみタイプにも なりやすい。いのちが 0に なると しんで しまうよ。',
+          'よる 9じ〜あさ 6じは、ねむけが なくなっても あさまで ねているよ。ねている あいだは おせわミスに ならない。',
           'るすに する ときは「あずかりや」に あずけよう。',
-          'なにも ほしくないのに「かまって〜！」と よぶのは わがまま。そんな ときは「しかる」で しつけよう。しつけが ひくいと バトルで いうことを きかない ことが あるよ。',
+          'なにも ほしくないのに「かまって〜！」と よぶのは わがまま。そんな ときは「しかる」で しつけよう（わがままじゃ ない ときに しかると、かなしくて やみに ちかづくよ）。しつけが ひくいと バトルで いうことを きかない ことが あるよ。',
           'ねむけが いっぱいに なると かってに ねむる。ねている あいだは あそべないので、よるに「ねる」で ねかせて あげよう。',
         ]);
         sec('すがたと タイプ', [
@@ -1104,7 +1138,7 @@
         b.appendChild(h('div', { class: 'card flat' }, foes));
         const lethal = bt.lethal !== false && !ch.tutorial;
         if (lethal) {
-          b.appendChild(h('div', { class: 'warnbox', html: HG.art.icon('grave') + `<span>まけると ${U.esc(p.name)} は しんで しまいます。いまの Lv.${p.level}。とちゅうで アプリを とじると「にげた」ことに なるよ。</span>` }));
+          b.appendChild(h('div', { class: 'warnbox', html: HG.art.icon('grave') + `<span>まけると ${U.esc(p.name)} は しんで しまいます。いまの Lv.${p.level}。とちゅうで アプリが とじても、つぎに ひらいた とき つづきから たたかうよ。</span>` }));
         }
         const go = h('button', { class: 'btn big ' + (lethal ? 'pink' : 'lime') + ' block' }, 'たたかう');
         go.onclick = async () => {
@@ -1124,18 +1158,31 @@
     });
   };
   // ストーリーの しょうり
-  S.storyWin = async function (ch, node) {
+  // かった ことを すぐ きろくする（バトルの すぐ あと）
+  S.storyAdvance = function (ch, node) {
     const p = pet();
     const s = save();
     const chapter = HG.STORY[ch];
+    if (!p || !chapter || p.story.ch !== ch || p.story.node !== node) return { done: false };
     p.story.node = node + 1;
-    if (p.story.node >= chapter.battles.length) {
-      p.story.ch = ch + 1;
-      p.story.node = 0;
-      p.story.seenIntro = false;
-      s.best.chapter = Math.max(s.best.chapter, ch);
-      if (ch >= 4 && !s.eggs.includes('star')) s.eggs.push('star');
-      persist();
+    if (p.story.node < chapter.battles.length) return { done: false };
+    p.story.ch = ch + 1;
+    p.story.node = 0;
+    p.story.seenIntro = false;
+    s.best.chapter = Math.max(s.best.chapter, ch);
+    if (ch >= 4 && !s.eggs.includes('star')) s.eggs.push('star');
+    if (chapter.final) P.log(p, 'わすれものの くにを すくった');
+    return { done: true };
+  };
+  S.storyWin = async function (ch, node) {
+    const r = S.storyAdvance(ch, node);
+    persist();
+    if (r.done) await S.storyOutro(ch);
+  };
+  S.storyOutro = async function (ch) {
+    const p = pet();
+    const chapter = HG.STORY[ch];
+    {
       const boss = chapter.battles[chapter.battles.length - 1].enemies[0][0];
       const enemy = HG.ENEMIES[boss];
       const ctx = S.talkCtx(enemy);
@@ -1144,7 +1191,6 @@
       if (chapter.final && p.type === 'dark') lines.splice(1, 0, ['enemy', '…おまえも、わすれられた ことが あるんだな。それでも ここまで きたのか。']);
       await UI.talk(lines, ctx);
       if (chapter.final) {
-        P.log(p, 'わすれものの くにを すくった');
         await UI.modal({ art: HG.art.creature(P.look(p), { uid: 'fin', expr: 'happy', cls: 'anim-hop' }), title: 'ぜんぶ クリア！', html: `<p>${U.esc(p.name)} と いっしょに まちを すくったよ。メニューに「ゆめの とう」が ふえた。</p>`, buttons: [{ label: 'やったね', cls: 'pink', value: 1 }] });
       }
     }
@@ -1251,7 +1297,10 @@
     if (cnt('sick')) lines.push('びょうきに なった');
     if (cnt('dozed')) lines.push('ねむくて、そのまま ねむって しまった');
     if (cnt('woke')) lines.push('ひとりで おきた');
-    if (cnt('mistake')) lines.push('おせわミス ＋' + cnt('mistake'));
+    if (cnt('mistake')) {
+      const ks = [...new Set(ev.filter((e) => e.kind === 'mistake').map((e) => P.MISTAKE_SHORT[e.key] || e.key))];
+      lines.push('おせわミス ＋' + cnt('mistake') + '（' + ks.join('・') + '）');
+    }
     if (p.hunger < 15) lines.push('おなかが ぺこぺこ');
     if (cnt('daycare_end')) lines.push('あずかりやから かえってきた');
     if (!lines.length) return;
